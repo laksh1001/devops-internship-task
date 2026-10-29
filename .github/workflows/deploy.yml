@@ -1,17 +1,40 @@
+# Name of the GitHub Actions workflow displayed in the Actions tab
 name: CI/CD Pipeline
 
+# Trigger the workflow automatically on every git push to the main branch
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  deploy:
+  # Job 1: Static security and vulnerability scanning using Trivy
+  security-scan:
     runs-on: ubuntu-latest
-
     steps:
+    # Check out the latest repository code into the runner workspace
     - name: Checkout Repository
       uses: actions/checkout@v4
 
+    # Run Trivy to scan the repository filesystem for High and Critical security vulnerabilities
+    - name: Run Trivy Vulnerability Scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        ignore-unfixed: true
+        format: 'table'
+        severity: 'CRITICAL,HIGH'
+
+  # Job 2: Automated deployment to AWS EC2 over SSH (Runs only if security-scan succeeds)
+  deploy:
+    needs: security-scan
+    runs-on: ubuntu-latest
+
+    steps:
+    # Check out repository code for deployment step reference
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    # Execute SSH commands on the remote AWS EC2 instance using stored GitHub Secrets
     - name: Deploy Application to AWS EC2 via SSH
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -19,10 +42,21 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          # Navigate into the project repository folder on EC2
           cd ~/devops-internship-task
+          
+          # Pull the latest changes from the main branch
           git pull origin main
+          
+          # Safely stop and remove any existing running container instance
           docker stop web-container || true
           docker rm web-container || true
+          
+          # Build the updated Docker container image
           docker build -t my-web-app:v1 .
+          
+          # Run the new container in detached mode mapping host port 8081 to container port 8081
           docker run -d -p 8081:8081 --name web-container my-web-app:v1
+          
+          # Verify container status and active port mappings
           docker ps
