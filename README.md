@@ -35,7 +35,7 @@ An end-to-end DevOps pipeline implementing secure Docker containerization, autom
                                               |    (Port 8081:8081)      |
                                               +--------------------------+
 
-                                [  TASK in System]
+                                [TASK DONE]
                                       |
                                       v
          +----------------------------------------------------------+
